@@ -8,20 +8,32 @@ import asyncio
 from discord.ext import commands
 from discord import app_commands
 
+##########################################
+#
+# Configure the Internet - 2024 / 1 / 31
+# 
+# Run the following command:
+#
+# docker network create --subnet=10.73.17.0/24 kvmnet
+#
+# To make the network for kvm-i7 servers.
+#
+##########################################
+
 NODES = [
-    {"id": "local", "ip": "localhost", "tmate": True},
+    {"id": "my-1-xen", "ip": "", "tmate": False},
+    {"id": "cz-1-xen", "ip": "", "tmate": True},
 ]
 
 remote_user = "root"
 remote_password = ""
-server_id = 997017581766574230
-allowed_roles = [1255822874481004604]
-REVIEW_CHANNEL = "https://discord.com/channels/997017581766574230/1344545086670639124"
-LEGIT_CHANNEL = "https://discord.com/channels/997017581766574230/1344545086670639124"
-TOKEN = ''
+server_id = 1293949144540381185
+allowed_roles = [1304429499445809203]
+session_file = "/sessions.txt"
+database_file = "database.txt"
 
 intents = discord.Intents.all()
-bot = commands.Bot(command_prefix="s!", intents=intents)
+bot = commands.Bot(command_prefix="!", intents=intents)
 
 def is_authorized(interaction):
     return interaction.guild.id == server_id and any(role.id in allowed_roles for role in interaction.user.roles)
@@ -44,84 +56,33 @@ async def capture_ssh_session_line(stdout):
     return None
 
 async def create_docker_container(memory, cores, customer_id, vps_count, node, random_port):
+    remote_host = node["ip"]
     container_name = f"vps_{customer_id}_{random_port}"
-    if node["ip"] in ["localhost", "0.0.0.0", "127.0.0.1"]:
-        docker_command = (
-            f"docker run -itd --hostname=servertipacvn --privileged --dns=1.1.1.1 "
-            f"--net kvmnet --memory {memory}g --cpus {cores} --name {container_name} utmp"
-        )
-        result = await asyncio.to_thread(
-            subprocess.run, docker_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
-        )
-        if result.returncode != 0:
-            return None, f"Error in container creation: {result.stderr}"
+    ssh = paramiko.SSHClient()
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    try:
+        await asyncio.to_thread(ssh.connect, remote_host, username=remote_user, password=remote_password)
+        docker_command = f"docker run -itd --hostname=servertipacvn --privileged --dns=1.1.1.1 --net kvmnet --memory {memory}g --cpus {cores} --name {container_name} utmp &"
+        stdin, stdout, stderr = await asyncio.to_thread(ssh.exec_command, docker_command)
+        if stderr.read():
+            return None, "Error in container creation."
         if node["tmate"]:
-            exec_tmate_command = f'docker exec {container_name} sh -c "cd ~ && tmate -F"'
-            proc = await asyncio.to_thread(
-                subprocess.Popen, exec_tmate_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
-            )
-            tmate_session = None
-            while True:
-                line = proc.stdout.readline()
-                if not line:
-                    break
-                if "ssh session:" in line.lower():
-                    tmate_session = line.split("ssh session:")[1].strip()
-                    break
+            exec_tmate_command = f"""docker exec {container_name} sh -c "cd ~ && tmate -F" """
+            stdin, stdout, stderr = await asyncio.to_thread(ssh.exec_command, exec_tmate_command)
+            tmate_session = await capture_ssh_session_line(stdout)
             if not tmate_session:
                 return None, "Error retrieving tmate session."
-            return container_name, node["ip"], tmate_session, None
+            return container_name, remote_host, tmate_session, None
         else:
-            ssh_port_command = (
-                f"docker run -itd --hostname=servertipacvn --privileged --dns=1.1.1.1 "
-                f"--net kvmnet -p {random_port}:22 --memory {memory}g --cpus {cores} --name {container_name} utmp"
-            )
-            result_port = await asyncio.to_thread(
-                subprocess.run, ssh_port_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
-            )
-            if result_port.returncode != 0:
-                return None, f"Error in container creation with port mapping: {result_port.stderr}"
+            ssh_port_command = f"docker run -itd --hostname=spacecore --privileged --dns=1.1.1.1 --net kvmnet -p {random_port}:22 --memory {memory} --cpus {cores} --name {container_name} utmp"
+            await asyncio.to_thread(ssh.exec_command, ssh_port_command)
             random_password = generate_random_password()
-            password_command = f'docker exec {container_name} sh -c "echo root:{random_password} | chpasswd"'
-            result_pass = await asyncio.to_thread(
-                subprocess.run, password_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
-            )
-            if result_pass.returncode != 0:
-                return None, f"Error setting password: {result_pass.stderr}"
-            return container_name, node["ip"], random_port, random_password
-    else:
-        remote_host = node["ip"]
-        ssh = paramiko.SSHClient()
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        try:
-            await asyncio.to_thread(ssh.connect, remote_host, username=remote_user, password=remote_password)
-            docker_command = (
-                f"docker run -itd --hostname=servertipacvn --privileged --dns=1.1.1.1 "
-                f"--net kvmnet --memory {memory}g --cpus {cores} --name {container_name} utmp &"
-            )
-            stdin, stdout, stderr = await asyncio.to_thread(ssh.exec_command, docker_command)
-            if stderr.read():
-                return None, "Error in container creation."
-            if node["tmate"]:
-                exec_tmate_command = f'docker exec {container_name} sh -c "cd ~ && tmate -F"'
-                stdin, stdout, stderr = await asyncio.to_thread(ssh.exec_command, exec_tmate_command)
-                tmate_session = await capture_ssh_session_line(stdout)
-                if not tmate_session:
-                    return None, "Error retrieving tmate session."
-                return container_name, remote_host, tmate_session, None
-            else:
-                ssh_port_command = (
-                    f"docker run -itd --hostname=servertipacvn --privileged --dns=1.1.1.1 "
-                    f"--net kvmnet -p {random_port}:22 --memory {memory} --cpus {cores} --name {container_name} utmp"
-                )
-                await asyncio.to_thread(ssh.exec_command, ssh_port_command)
-                random_password = generate_random_password()
-                password_command = f'docker exec {container_name} sh -c "echo root:{random_password} | chpasswd"'
-                await asyncio.to_thread(ssh.exec_command, password_command)
-                return container_name, remote_host, random_port, random_password
-        finally:
-            ssh.close()
-
+            password_command = f"docker exec {container_name} sh -c \"echo root:{random_password} | chpasswd\""
+            await asyncio.to_thread(ssh.exec_command, password_command)
+            return container_name, remote_host, random_port, random_password
+    finally:
+        ssh.close()
+        
 @bot.tree.command(name="deploy", description="Deploy a customer VPS on a specific node")
 @app_commands.describe(memory="Memory limit (e.g., 1)", cores="Number of CPU cores", customer="The user to DM", node_id="Node ID (e.g., usa-1)")
 async def deploy_customer(interaction: discord.Interaction, memory: str, cores: str, customer: discord.Member, node_id: str):
@@ -147,17 +108,17 @@ async def deploy_customer(interaction: discord.Interaction, memory: str, cores: 
 Access via SSH:
 
 `{ssh_info}`
-- 💾 **Bộ nhớ máy chủ VPS:** {memory}GB
-- 📗 **Core máy chủ VPS:** {cores}
+- 🌐 **Shared-IPv4 Usage:** Use the `port` command to add ports
+- 💾 **VPS Server Memory:** {memory}GB
+- 📗 **VPS Server Cores:** {cores}
 
 **🚀 Quick Start:**
-- 📱 Mobile: dùng **Termux** để kết nối. (Termius không được)
-- 🖥️ PC: mở `cmd` và dán lệnh trong cmd.
+- 📱 Mobile: Use **Termux** to connect. (Termius won't work)
+- 🖥️ PC: Open `cmd` and paste the command in.
 
 💬 **Share Your Experience!**
-- 🖼️ Screenshot `neofetch` & post in [Showcase]({LEGIT_CHANNEL}).
-- ⭐ Feedback in [Rate Us]({REVIEW_CHANNEL}).
-- 👍 Discord Bot made by <https://dsc.gg/servertipacvn>
+- 🖼️ Screenshot `neofetch` & post in [Showcase](https://discord.com/channels/1293949144540381185/1334682558507647007).  
+- ⭐ Feedback in [Rate Us](https://discord.com/channels/1293949144540381185/1334682666301263883).
 """
         else:
             ssh_details = f"""**Your VPS is Ready!**
@@ -166,16 +127,17 @@ Access via SSH:
 `ssh root@{remote_host} -p {ssh_info}`
 - 👤 **Username:** `root`
 - 🔑 **Password:** `{password}`
+- 🌐 **Shared-IPv4 Usage**: Use the `port` command to add ports
 
 **🚀 Quick Start:**
 - 📱 Mobile: Use **Termius** to connect.
 - 🖥️ PC: Open `cmd` and paste the command in.
 
 💬 **Share Your Experience!**
-- 🖼️ Screenshot `neofetch` & post in [Showcase]({LEGIT_CHANNEL}).
-- ⭐ Feedback in [Rate Us]({REVIEW_CHANNEL}).
-- 👍 Discord Bot made by <https://dsc.gg/servertipacvn>
+- 🖼️ Screenshot `neofetch` & post in [Showcase](https://discord.com/channels/1293949144540381185/1334682558507647007).  
+- ⭐ Feedback in [Rate Us](https://discord.com/channels/1293949144540381185/1334682666301263883).
 """
+
         try:
             await customer.send(ssh_details)
         except discord.Forbidden:
@@ -191,12 +153,4 @@ async def on_ready():
     activity = discord.Activity(type=discord.ActivityType.watching, name="VPS Instances")
     await bot.change_presence(activity=activity)
 
-if __name__ == "__main__":
-    print("Current Node Configuration:")
-    for node in NODES:
-        print(node)
-    confirmation = input("Is the node configuration correct? (y/n): ")
-    if confirmation.lower() != "y":
-        print("Exiting. Please update your node configuration.")
-        exit(1)
-    bot.run(TOKEN)
+bot.run('')
