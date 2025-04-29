@@ -31,7 +31,7 @@ server_id = 997017581766574230
 allowed_roles = [1255822874481004604]
 session_file = "/sessions.txt"
 database_file = "database.txt"
-TOKEN = ''
+TOKEN = ""
 
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="!", intents=intents)
