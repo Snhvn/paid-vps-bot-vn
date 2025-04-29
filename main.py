@@ -31,6 +31,7 @@ server_id = 997017581766574230
 allowed_roles = [1255822874481004604]
 session_file = "/sessions.txt"
 database_file = "database.txt"
+TOKEN = ''
 
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="!", intents=intents)
@@ -153,4 +154,4 @@ async def on_ready():
     activity = discord.Activity(type=discord.ActivityType.watching, name="VPS Instances")
     await bot.change_presence(activity=activity)
 
-bot.run('')
+bot.run('TOKEN')
