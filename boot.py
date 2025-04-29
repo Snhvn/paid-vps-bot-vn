@@ -8,8 +8,8 @@ from discord import app_commands
 
 WEBHOOK_URL = ""
 TOKEN = ""
-SERVER_ID = 1293949144540381185
-ALLOWED_ROLES = [1304429499445809203]
+SERVER_ID = 997017581766574230
+ALLOWED_ROLES = [1255822874481004604]
 NODE_DETAILS = {
     "usa-1": {"ip": "localhost", "username": "host2", "password": ""},
 }
