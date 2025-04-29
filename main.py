@@ -27,8 +27,8 @@ NODES = [
 
 remote_user = "root"
 remote_password = ""
-server_id = 1293949144540381185
-allowed_roles = [1304429499445809203]
+server_id = 997017581766574230
+allowed_roles = [1255822874481004604]
 session_file = "/sessions.txt"
 database_file = "database.txt"
 
