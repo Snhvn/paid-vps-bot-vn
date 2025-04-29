@@ -47,7 +47,7 @@ async def create_docker_container(memory, cores, customer_id, vps_count, node, r
     container_name = f"vps_{customer_id}_{random_port}"
     if node["ip"] in ["localhost", "0.0.0.0", "127.0.0.1"]:
         docker_command = (
-            f"docker run -itd --hostname=spacecore --privileged --dns=1.1.1.1 "
+            f"docker run -itd --hostname=servertipacvn --privileged --dns=1.1.1.1 "
             f"--net kvmnet --memory {memory}g --cpus {cores} --name {container_name} utmp"
         )
         result = await asyncio.to_thread(
@@ -73,7 +73,7 @@ async def create_docker_container(memory, cores, customer_id, vps_count, node, r
             return container_name, node["ip"], tmate_session, None
         else:
             ssh_port_command = (
-                f"docker run -itd --hostname=spacecore --privileged --dns=1.1.1.1 "
+                f"docker run -itd --hostname=servertipacvn --privileged --dns=1.1.1.1 "
                 f"--net kvmnet -p {random_port}:22 --memory {memory}g --cpus {cores} --name {container_name} utmp"
             )
             result_port = await asyncio.to_thread(
@@ -96,7 +96,7 @@ async def create_docker_container(memory, cores, customer_id, vps_count, node, r
         try:
             await asyncio.to_thread(ssh.connect, remote_host, username=remote_user, password=remote_password)
             docker_command = (
-                f"docker run -itd --hostname=spacecore --privileged --dns=1.1.1.1 "
+                f"docker run -itd --hostname=servertipacvn --privileged --dns=1.1.1.1 "
                 f"--net kvmnet --memory {memory}g --cpus {cores} --name {container_name} utmp &"
             )
             stdin, stdout, stderr = await asyncio.to_thread(ssh.exec_command, docker_command)
@@ -111,7 +111,7 @@ async def create_docker_container(memory, cores, customer_id, vps_count, node, r
                 return container_name, remote_host, tmate_session, None
             else:
                 ssh_port_command = (
-                    f"docker run -itd --hostname=spacecore --privileged --dns=1.1.1.1 "
+                    f"docker run -itd --hostname=servertipacvn --privileged --dns=1.1.1.1 "
                     f"--net kvmnet -p {random_port}:22 --memory {memory} --cpus {cores} --name {container_name} utmp"
                 )
                 await asyncio.to_thread(ssh.exec_command, ssh_port_command)
@@ -174,7 +174,7 @@ Access via SSH:
 💬 **Share Your Experience!**
 - 🖼️ Screenshot `neofetch` & post in [Showcase]({LEGIT_CHANNEL}).
 - ⭐ Feedback in [Rate Us]({REVIEW_CHANNEL}).
-- 👍 Discord Bot made by <https://discord.gg/kvm>
+- 👍 Discord Bot made by <https://dsc.gg/servertipacvn>
 """
         try:
             await customer.send(ssh_details)
