@@ -7,7 +7,7 @@ from discord.ext import commands
 from discord import app_commands
 
 WEBHOOK_URL = ""
-TOKEN = ""
+TOKEN = ''
 SERVER_ID = 997017581766574230
 ALLOWED_ROLES = [1255822874481004604]
 NODE_DETAILS = {
